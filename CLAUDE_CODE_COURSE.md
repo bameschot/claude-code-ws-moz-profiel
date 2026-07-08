@@ -550,40 +550,48 @@ Write a minimal prompt for a well-scoped addition — just enough to be
 unambiguous.
 
 ### Task
-Add a new value to one of the domain enums — for example a new `ContactType` or
-`VoorkeurType` — and make sure it is validated and accepted everywhere the
-existing values are.
+Add one small, optional field to the note resource you built in Exercises 4 and 5
+— for example a `categorie` label — validated and mapped like the note's existing
+fields. This is the "small addition to the thing you just built" step: after
+decomposing a large feature, you now practise recognising when a change is genuinely
+small.
 
 ### Starting prompt
 
-> "Add a new ContactType value for a fax number, and make sure it is accepted and
-> validated like the existing types."
+> "Add an optional category label to notes."
 
 ### Hints
-That is enough to get a working result. One thing worth checking after: is the new
-value accepted by the request DTOs, handled by any type-specific logic (email, for
-instance, is lowercased and triggers verification — does the new type need
-anything special?), and rejected cleanly when misspelled?
+That terse prompt is deliberately enough. The lesson here is the opposite of
+Exercise 4: when a change really is small, over-specifying the prompt just gets in
+the way — state the goal and let Claude fit it to the existing note code.
+
+One thing worth checking after: does the new field flow through every layer the
+note already touches — the entity, a Flyway migration, the request/response DTOs,
+the `PartijMapper`-style mapping, and validation — and is it rejected cleanly when
+invalid? Remember the Exercise 4 lesson: `schema-management` is `validate`, so the
+new column needs a matching migration or the app will not start.
 
 This exercise also introduces a useful pattern for any change that touches a name
-in several places: before making the change, ask **"list every place `ContactType`
-is referenced in the codebase"** first, then ask for the change in a second prompt.
-Seeing the full list up front tells you whether the change is really small or
-secretly large.
+in several places: before making the change, ask **"list every place a note is
+represented in the codebase — entity, migration, DTOs, mapper, service, controller,
+tests"** first, then ask for the field in a second prompt. Seeing the full list up
+front tells you whether the change is really small or secretly large.
 
-After adding the value, ask Claude to update `README.md` if the supported types
-are documented there.
+After adding the field, ask Claude to update `design.md` (and `README.md` if the
+note fields are documented there).
 
 ### Quality bar
-The new value can be sent to the relevant endpoints and is validated the same way
-as the existing values; an invalid value still returns a `problem+json` 400. No
-unrelated code changed.
+The new field can be sent to the note endpoints and is accepted, validated, and
+returned like the existing fields; an invalid value still returns a `problem+json`
+400; and the app starts (proving the new column and the entity agree). No unrelated
+code changed.
 
 ### Iteration cues
-- If the value is accepted but mishandled: "The new type is accepted but [X]
-  happens. Do email-specific paths need to exclude it?"
-- If Claude changed more than expected: "Was that change needed for the new enum
-  value, or is it a separate concern?"
+- If the field is accepted but not persisted or returned: "The category is accepted
+  but does not come back on read. Which layer dropped it — the mapping, the entity,
+  or the migration?"
+- If Claude changed more than expected: "Was that change needed for the new field,
+  or is it a separate concern?"
 
 ---
 
