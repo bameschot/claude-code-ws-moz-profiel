@@ -27,58 +27,39 @@ Work through these in order. Each exercise's output becomes input to the next.
 ## Attribution
 
 The Profiel Service is developed by the **Ministerie van Binnenlandse Zaken en
-Koninkrijksrelaties (MinBZK)** as part of MijnOverheid Zakelijk. It is published
-under the **EUPL-1.2** license. Documentation lives at:
-
-> **[https://docs.mijnoverheidzakelijk.nl](https://docs.mijnoverheidzakelijk.nl)**
-
-The extensions you build in these exercises are your own work, layered on top of
-the existing service, and inherit the same EUPL-1.2 license.
+Koninkrijksrelaties (MinBZK)** as part of MijnOverheid Zakelijk, under the
+**EUPL-1.2** license. Docs: **[docs.mijnoverheidzakelijk.nl](https://docs.mijnoverheidzakelijk.nl)**.
+The extensions you build here are your own work and inherit the same license.
 
 ---
 
 ## What You Are Working On
 
 The Profiel Service lets citizens and businesses (`partijen`) manage their
-contact details (`contactgegevens`) and communication preferences (`voorkeuren`)
-in one trusted place, and lets government service providers (`dienstverleners`)
-retrieve up-to-date, reusable profile information. The code is organised in
-layers — the same layering you will exploit to scope every exercise:
+contact details (`contactgegevens`) and communication preferences (`voorkeuren`),
+and lets government service providers (`dienstverleners`) retrieve reusable
+profile information. It is organised in layers — the same layering you exploit to
+scope every exercise:
 
-**The controllers** (`src/main/java/nl/rijksoverheid/moz/controller/`) are the
-REST layer. They expose the HTTP API under `/api/profielservice/v1`, validate
-input, translate outcomes into status codes and RFC 9457 `problem+json` errors,
-and record audit entries. They contain **no** business logic and **no** direct
-database access — they delegate to services. `ProfielController`,
-`DienstverlenerController`, and `EmailVerificatieController` live here.
+- **Controllers** (`controller/`) — the REST layer under `/api/profielservice/v1`:
+  validate input, map outcomes to status codes and RFC 9457 `problem+json`, record
+  audit entries. No business logic or DB access; they delegate to services.
+  (`ProfielController`, `DienstverlenerController`, `EmailVerificatieController`.)
+- **Services** (`services/`) — the domain logic: `@Transactional` beans that read
+  and write entities and enforce invariants. (`PartijService`,
+  `DienstverlenerService`, `EmailVerificatieService`, plus the shared circuit
+  breaker `VerificatieServiceGuard`.)
+- **Persistence** (`entity/` + `db/migration/`) — **Hibernate Panache** entities
+  (active-record, static finders) over a **Flyway**-owned schema. In production
+  Hibernate only *validates* against it, so schema and entities must always agree.
+- **External clients** — the KVK Basisprofiel and NotifyNL verification services,
+  *generated* from OpenAPI specs and called through the shared circuit breaker.
+- **Cross-cutting** — `SecurityHeadersFilter`, the `@RequireBody` interceptor, the
+  `problem+json` exception mappers, LDV audit logging (`@Logboek`), and the
+  `RetentieScheduler`.
 
-**The services** (`services/`) are where the domain logic lives. They are
-`@ApplicationScoped` beans with `@Transactional` methods that read and write
-entities, enforce invariants (one default contact detail per type, one
-preference per party+type+scope), and call external systems. `PartijService`,
-`DienstverlenerService`, and `EmailVerificatieService` are the core; the shared
-circuit breaker lives in `VerificatieServiceGuard`.
-
-**The persistence layer** (`entity/` + `src/main/resources/db/migration/`) is the
-data model. Entities use **Hibernate ORM with Panache** in the active-record
-style (static finders like `Partij.findByIdentificatie`). The schema is owned by
-**Flyway** SQL migrations (`V1`, `V2`, `V3`); in production Hibernate only
-*validates* against it, so schema and entities must always agree.
-
-**The external clients** talk to systems outside the service: the KVK
-Basisprofiel API and the NotifyNL verification service. Their client code is
-*generated* from OpenAPI specs (`src/main/resources/openapi/`,
-`src/main/openapi/`), and calls are wrapped in a shared circuit breaker so a
-failing dependency cannot hang the service.
-
-**The cross-cutting layer** holds everything that applies across endpoints: the
-`SecurityHeadersFilter` and `@RequireBody` interceptor (`filter/`), the exception
-mappers that produce `problem+json` (`controller/`), the LDV audit logging
-(`@Logboek`), and the `RetentieScheduler` that sets deletion dates on stale data.
-
-You do not need to hold this whole picture in your head. Exercise 1 has you build
-`design.md` — a complete architecture and data-model map of the service — which
-then becomes the context you (and Claude) open every later session with.
+You do not need to hold this in your head — Exercise 1 has you build `design.md`, a
+map of exactly this, which then seeds every later session.
 
 ---
 
@@ -130,15 +111,10 @@ a separate management port: `http://localhost:9090/q/health`.
 
 ### Start with a git repository
 
-The clone is already a git repository — make an initial commit before you change
-anything. This gives you a safety net for every exercise: if a prompt produces a
-result that breaks something that was working, you can see exactly what changed
-(in VS Code's Source Control panel or with `git diff`) and revert to the last
-good state with a single command.
-
-Get into the habit of committing after each exercise completes and its tests
-pass. A commit history also gives Claude useful context — you can ask "what
-changed since the last commit?" to orient a new session quickly.
+Make an initial commit before you change anything — it is your safety net. If a
+prompt breaks something, `git diff` shows exactly what changed and `git checkout .`
+reverts it. Commit after each exercise passes; the history also lets you ask Claude
+"what changed since the last commit?" to orient a new session.
 
 ### Ground rules
 
@@ -154,110 +130,74 @@ changed since the last commit?" to orient a new session quickly.
 3. **One concern per prompt.** Mixing two tasks in one message produces output
    that is hard to test and harder to fix.
 
-4. **Use a review prompt when output is large.** Before accepting a substantial
-   result, ask Claude to review it. See *The Review Prompt* section below.
+4. **Review large output before running it.** See *The Review Prompt* below.
 
-5. **Keep a living README and design.md.** After each exercise, ask Claude to
-   update both files to reflect what has been built. See *Living Documentation*
-   below.
+5. **Keep `README.md` and `design.md` current.** See *Living Documentation* below.
 
 6. **Commit when tests pass.** A passing commit is a safe rollback point. If the
    next prompt breaks something, `git checkout .` gets you back instantly.
 
-7. **Use plan mode for complex exercises.** Before asking Claude to write a large
-   or high-stakes piece of code, switch into plan mode (Shift+Tab in Claude Code,
-   or ask "think through the approach before writing any code"). Claude will
-   reason through the design, surface trade-offs, and wait for your approval
-   before producing anything. This is especially useful for the vertical feature
-   (Exercise 4), the concurrency feature (Exercise 7), and the audit history API
-   (Exercise 8) — exercises where a structural mistake is expensive to undo.
+7. **Use plan mode for complex exercises.** Before a large or high-stakes change,
+   switch into plan mode (Shift+Tab) so Claude designs and gets your approval
+   before writing anything. Especially useful for Exercises 4 and 7, where a
+   structural mistake is expensive to undo.
 
-8. **Match the model to the task.** Not every prompt needs the most powerful
-   model. A rough guide:
-   - **Opus / high effort** — analysis, documentation, architecture decisions,
-     the conventions reference, and any prompt where the answer will be reused
-     many times. Worth the extra cost when the output shapes everything that
-     follows.
-   - **Sonnet / medium effort** — implementation, adding endpoints, writing
-     tests, fixing bugs. Fast enough to iterate quickly and capable enough for
-     the work. Use this for the majority of prompts.
+8. **Match the model to the task.** Use **Opus / high effort** for analysis,
+   documentation, and architecture — anything whose output shapes what follows.
+   Use **Sonnet / medium effort** for implementation, tests, and bug fixes: fast
+   to iterate, and enough for most prompts.
 
 ### The one rule to keep
 
-The Profiel Service has one architectural rule that, if broken, causes a class of
-problems that are painful to fix later:
+The Profiel Service has one architectural rule that is painful to fix if broken:
 
 > **Controllers stay thin.** No database access and no business logic in the REST
 > layer — all domain logic goes in a `@Transactional` service method. And PII
 > (identificatienummers such as BSN/KVK/RSIN) must be hashed via `HashHelper`
 > before it is written to a log.
 
-State this rule to Claude when you ask for anything that touches a controller or
-adds logging, and put it in `design.md` (Exercise 2) so it is applied in every
-future session without you having to repeat it.
+State this rule when you ask for anything touching a controller or adding logging,
+and record it in `design.md` (Exercise 2) so it applies in every future session
+without repeating it.
 
 ---
 
 ## The Review Prompt
 
-When Claude produces a large result — a new endpoint, a service method with real
-logic, a test suite — do not just build it and hope for the best. Ask Claude to
-review its own output before you run it:
+When Claude produces a large result, ask it to review its own output before you
+run it — it reasons more critically when asked directly:
 
 > "Review what you just wrote. What are the most likely problems or edge cases
 > you may have missed?"
 
-This works because Claude can reason about its output more critically when asked
-directly. A good review response will surface at least one real issue — a missing
-`@Transactional`, an unhandled 404 path, a validation gap — handle it before
-moving on.
+A good review surfaces at least one real issue — a missing `@Transactional`, an
+unhandled 404, a validation gap — handle it before moving on. When something feels
+off after testing, review the specific behaviour instead:
 
-You can also use a targeted review when something feels off after testing:
+> "I ran it and observed [X]. Review the relevant code and explain why it might
+> behave that way."
 
-> "I ran it and observed [X]. Review the relevant part of the code and explain
-> why it might behave that way."
-
-The review prompt is not a substitute for running the code — it is a complement.
-Use it after every exercise that produces non-trivial output.
+This complements running the code, it does not replace it. Use it after every
+exercise that produces non-trivial output.
 
 ---
 
 ## Living Documentation
 
-As the project grows across multiple sessions, Claude loses track of what has
-already been built. A `README.md` and a `design.md` that stay up to date solve
-this: at the start of any new session you paste them in as context — or simply
-ask Claude to read them: "Read design.md and README.md before we continue." —
-and Claude immediately knows the current state of the project.
+Across sessions Claude loses track of what has been built. Two committed files fix
+this — open every new session with them ("Read design.md and README.md before we
+continue"):
 
-After each exercise, ask:
+- `README.md` — for a **user**: what the service does, how to run it, what
+  endpoints exist.
+- `design.md` — for **Claude**: the layered architecture, key design decisions,
+  what each package does, and the rules to keep (such as the thin-controller rule).
 
-> "Update README.md and design.md to reflect what was just added."
-
-Then run `/compact` before starting the next exercise. Each exercise generates a
-lot of back-and-forth — code, test output, fixes, reviews — and the context
-window fills up quickly. `/compact` summarises the conversation so far and
-discards the detail, keeping only what matters for the next step. With up-to-date
-`design.md` and `README.md` files already committed, almost nothing important
-is lost: Claude can read those files to reconstruct the project state at any
-point.
-
-`README.md` should describe the project for a user: what the service does, how to
-run it, and which endpoints are available. `design.md` should describe the
-project for Claude: the layered architecture, the key design decisions, what
-packages exist and what they do, and any rules that must be kept (such as the
-thin-controller rule above).
-
-You create `design.md` in Exercise 1; from then on, keep it current the same way
-you keep `README.md` current — updating it after every exercise so it always
-reflects the real state of the service.
-
-A good `design.md` entry after Exercise 2 might read: *"Controllers in
-`controller/` must never call a Panache finder or `persist()` directly. All
-persistence goes through a `@Transactional` method on a service in `services/`.
-Errors are returned as `problem+json` built with the `Problems` helper, never as
-raw exceptions."* That rule will then be applied consistently in every future
-session without you having to repeat it.
+After each exercise, ask Claude to *"update README.md and design.md to reflect what
+was just added,"* then run `/compact` before the next one. Each exercise fills the
+context window with code, test output, and fixes; `/compact` summarises and
+discards the detail. Because the two docs are already committed and current, almost
+nothing important is lost — Claude reconstructs the project state from them.
 
 ---
 
@@ -279,8 +219,8 @@ There is no such document yet; you are creating it.
 > document called design.md placed in the root of the repository."
 
 ### Hints
-That prompt works but tends to produce a long wall of prose. A few small additions
-make the output something you can actually navigate and reuse:
+That prompt works but produces a wall of prose. A few additions make the output
+navigable and reusable:
 
 - Ask for a **specific format**: "for the code, use a table — one row per package
   (or key class), showing its responsibility, what it provides, and what it
@@ -293,9 +233,6 @@ make the output something you can actually navigate and reuse:
   Panache, Flyway, ...), the database schema from the Flyway migrations (tables,
   keys, important constraints), and how the tests are run and what the coverage
   gate requires."
-
-Ask Claude to save the result as `design.md` in the repository so it can be used
-as context in future sessions.
 
 ### Quality bar
 The output should name specific roles ("shared circuit breaker guarding the
@@ -350,11 +287,8 @@ specific patterns that make this service consistent:
 - **Scopes**: the `dienstverlener_dienst` join models a scope; a `null` dienst
   means the scope applies to the whole dienstverlener.
 
-Add the **one rule** explicitly, so you can read it into future prompts:
-
-- "Controllers must never access the database or contain business logic. All
-  domain logic lives in a `@Transactional` service; controllers only validate,
-  delegate, and map outcomes to status codes and `problem+json`."
+Include the thin-controller rule from *The one rule to keep* verbatim, so you can
+read it into future prompts.
 
 After getting the document, use the review prompt:
 
@@ -432,13 +366,11 @@ query the database itself.
 Scope a large feature into layers you can test one at a time.
 
 ### Background
-This is the exercise with the most moving parts, and the most important to get
-right. The service enforces its schema strictly:
-`quarkus.hibernate-orm.schema-management.strategy=validate` means Hibernate will
-refuse to start if an entity does not match the database. So a new domain concept
-is not one file — it is a Flyway migration, an entity, service logic, a
-controller, and tests, and they must all agree. Getting the bottom layers right
-first prevents startup failures and schema drift that are tedious to unwind later.
+The service enforces its schema strictly: `schema-management.strategy=validate`
+means Hibernate refuses to start if an entity does not match the database. So a new
+domain concept is not one file — it is a Flyway migration, an entity, service
+logic, a controller, and tests, and they must all agree. Building bottom-up gets
+each layer right before the next depends on it.
 
 ### Task
 Add a new domain concept end-to-end. For example, a `notitie` (a free-text note
@@ -452,31 +384,25 @@ attached to a partij) or a `toestemming` (a consent record). Build it bottom-up:
 > and conventions."
 
 ### Hints
-This is a good exercise for plan mode. Before writing any code, ask Claude to
-think through the layering: "Think through how to structure this feature before
+Use plan mode (ground rule 7): "Think through how to structure this feature before
 writing any code — the migration, the entity, the service methods, and the
-endpoint." Review the plan, push back on anything that feels off, then confirm —
-Claude will implement in one coherent pass rather than accumulating half-decisions
-across many prompts.
+endpoint." As part of that, ask what could go wrong at runtime — the failure modes
+to design around — before requesting code; naming them up front is cheaper than
+finding them in testing. Review and confirm the plan, then let Claude implement in
+one pass. Two additions keep the large task manageable:
 
-"Add a feature" is a large task. Two additions keep it manageable:
-
-- Start at the bottom: "Begin with the Flyway migration and the entity only.
-  Remember `schema-management` is `validate`, so the new table (name `V4__...`)
-  and the entity mapping must match exactly."
+- Start at the bottom: "Begin with the Flyway migration (`V4__...`) and the entity
+  only, and get the mapping to match the table exactly."
 - Ask for tests before moving up: "Write a service test against H2 before adding
   the controller."
 
-This creates a bottom-up rhythm: migration + entity → service → controller →
-integration test. Run `./mvnw verify` at each layer before moving on.
-
-After each layer, use the review prompt before running it:
+Run `./mvnw verify` at each layer before moving on, and review each layer before
+running it:
 
 > "Review the layer you just wrote. What are the most likely correctness or schema
 > problems?"
 
-When the feature is complete, ask Claude to update `design.md` with the new
-table, entity, and endpoint, and `README.md` with the new capability.
+When it's complete, update `README.md` and `design.md`.
 
 ### Quality bar
 `./mvnw verify` passes at each layer. The service starts cleanly (proving the
@@ -526,9 +452,7 @@ Spell out the contract precisely; this is where guessing produces subtle bugs:
 Test each verb and describe what you observe if something is off. Try deleting a
 note that does not exist and confirm you get a `problem+json` 404, not a 500.
 
-After the resource is complete, ask Claude to update `README.md` with the new
-endpoints and `design.md` with the status-code contract so future sessions
-match it.
+When it's complete, update `README.md` and `design.md`.
 
 ### Quality bar
 Each verb returns the correct status code; a duplicate create returns 200 (not a
@@ -577,8 +501,7 @@ represented in the codebase — entity, migration, DTOs, mapper, service, contro
 tests"** first, then ask for the field in a second prompt. Seeing the full list up
 front tells you whether the change is really small or secretly large.
 
-After adding the field, ask Claude to update `design.md` (and `README.md` if the
-note fields are documented there).
+Then update `design.md` (and `README.md` if it lists the note fields).
 
 ### Quality bar
 The new field can be sent to the note endpoints and is accepted, validated, and
@@ -595,80 +518,18 @@ code changed.
 
 ---
 
-## Exercise 7 — A Feature With Non-Obvious Failure Modes
-
-### Prompting objective
-Ask about constraints before asking for code when a feature has failure modes
-that only appear at runtime.
-
-### Background
-Some correctness problems in this service only show up under concurrency. The
-`contactgegeven` table has a **partial unique index** allowing only one default
-per `(partij, type)`, and `PartijService` already documents a careful
-"demote-before-mutate" ordering to avoid tripping it. Optimistic concurrency
-(ETag / `If-Match`) and race conditions on unique indexes are exactly the kind of
-feature where asking about constraints first pays off.
-
-### Task
-Add optimistic concurrency control to the update endpoints — an `ETag` on reads
-and an `If-Match` precondition on updates — or harden the default-per-type
-handling against concurrent writes. Pick one.
-
-### Starting prompt
-
-> "Add optimistic concurrency control to the contactgegeven update endpoint using
-> ETag and If-Match, so a stale update is rejected."
-
-### Hints
-This feature has runtime-only failure modes. Ask one question before any code is
-written:
-
-> "Before writing any code: what are the most common ways optimistic concurrency
-> and unique-constraint handling break in a JPA/Panache service, that I should
-> design around from the start?"
-
-Take the answer seriously. Then, when asking for the implementation, add:
-
-- "A conflicting update must return 409 `problem+json` via the existing exception
-  mapper, never a raw constraint-violation 500."
-
-The service already has a `DatabaseConstraintViolationMapper` — point Claude at
-it so unique-index violations surface as clean errors.
-
-After receiving the implementation, use the review prompt:
-
-> "Review this. What are the most likely problems with the version check or the
-> constraint handling that I should test first?"
-
-Then test in that order. Once it works, ask Claude to update `design.md` with
-how versioning and conflict handling work.
-
-### Quality bar
-An update with a stale `If-Match` returns 409 `problem+json`; a fresh one
-succeeds. A concurrent write that hits the unique index returns 409, not 500. The
-existing update tests still pass.
-
-### Iteration cues
-- If a conflict returns 500: "A version conflict returns 500. It should be a 409
-  `problem+json`. Is `DatabaseConstraintViolationMapper` catching this case?"
-- If stale updates slip through: "I sent an outdated If-Match and the update
-  still applied. What should the precondition check do?"
-
----
-
-## Exercise 8 — A Larger Multi-Step Feature: Audit History API
+## Exercise 7 — A Larger Multi-Step Feature: Audit History API
 
 ### Prompting objective
 Break a large feature into a sequence of steps, each small enough to test before
 the next one starts.
 
 ### Background
-The service is already wired for auditing but does not expose it. Entities such as
-`Partij` are annotated `@Audited`, and `quarkus-hibernate-envers` is a dependency
-— but `application.properties` has `quarkus.hibernate-envers.active=false` with a
-comment noting the audit tables are not in a migration yet. That makes this a
-realistic multi-step feature: turn on Envers, migrate its tables, and expose a
-read API over the revision history.
+The service is wired for auditing but does not expose it: entities are `@Audited`
+and `quarkus-hibernate-envers` is a dependency, but `application.properties` has
+`quarkus.hibernate-envers.active=false` and the audit tables are not migrated yet.
+So this is a realistic multi-step feature: turn on Envers, migrate its tables, and
+expose a read API over the revision history.
 
 ### Task
 Add an audit-history API: given a partij, return the history of changes to its
@@ -680,10 +541,9 @@ contact details and preferences over time.
 > change history of a partij."
 
 ### Hints
-Like Exercise 4, this benefits from plan mode before any code is written: "Think
-through how to enable Envers and expose its history safely before writing any
-code — the migration for the audit tables, the config change, and the query API."
-Agree on the structure, then proceed step by step.
+Use plan mode (as in Exercise 4): "Think through how to enable Envers and expose
+its history safely — the migration for the audit tables, the config change, and
+the query API." Agree on the structure, then proceed step by step.
 
 An audit feature is too large to produce and verify in one go. Ask for it in four
 steps, testing after each before moving on:
@@ -706,8 +566,7 @@ Use the review prompt after step 1, since the migration is the risky part:
 > "Review the Envers migration and config change. What is most likely to break
 > startup or schema validation?"
 
-When complete, ask Claude to update `README.md` with the history endpoints and
-`design.md` with how auditing is configured and queried.
+When complete, update `README.md` and `design.md`.
 
 ### Quality bar
 The app starts with Envers enabled (proving the audit-table migration matches what
@@ -723,7 +582,7 @@ both revisions in order.
 
 ---
 
-## Exercise 9 — A Cross-Cutting Change With Minimal Blast Radius
+## Exercise 8 — A Cross-Cutting Change With Minimal Blast Radius
 
 ### Prompting objective
 Ask Claude to find the minimal change before making one that touches everything.
@@ -755,9 +614,7 @@ Once you have the design confirmed, ask for the implementation:
 > "Implement it. Existing endpoints without paging parameters should keep their
 > current behaviour."
 
-After this exercise, ask Claude to update both `README.md` (with the paging
-parameters and an example) and `design.md` (with how paging is applied
-centrally).
+Then update `README.md` and `design.md`.
 
 ### Quality bar
 A list endpoint with `?page=&size=` returns the right slice; the same endpoint
@@ -793,7 +650,6 @@ the change did not alter unrelated behaviour.
 | Output is too large to know where to start | Use the review prompt first, then test the areas it flags |
 | Unsure whether the result is correct | "What would a test that catches a bug here look like?" |
 | App fails to start after a schema change | "Does the entity mapping match the Flyway migration? `validate` is strict" |
-| Starting a new session on an existing project | Ask Claude to read design.md and README.md first |
 
 ---
 
