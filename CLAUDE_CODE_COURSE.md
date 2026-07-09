@@ -99,6 +99,39 @@ reverts it. Commit after each exercise passes; the history also lets you ask Cla
    Use **Sonnet / medium effort** for implementation, tests, and bug fixes: fast
    to iterate, and enough for most prompts.
 
+### The session pattern
+
+Use the same loop throughout the course. It keeps Claude grounded in the project,
+keeps each change testable, and gives you clear follow-up prompts when something
+does not work:
+
+```text
+1. Context first    Read README.md and DESIGN.md before asking for a change.
+2. One thing        Ask for one task or one question at a time.
+3. Constraints      State what must not happen, such as controller logic or raw PII in logs.
+4. Plan             For larger changes, ask Claude to explain the layers and risks first.
+5. Review           Ask Claude to review its own output before you run it.
+6. Test             Run ./mvnw verify or quarkus:dev and observe the real behaviour.
+7. Iterate          Describe the observed symptom and ask for the cause.
+8. Document         Ask Claude to update README.md and DESIGN.md before moving on.
+```
+
+Do not treat this as ceremony. Each step gives Claude better context or gives you
+better evidence. If a result is surprising, do not ask Claude to "fix it" in the
+abstract; paste the command, output, HTTP response, stack trace, or diff you saw
+and ask it to reason from that observation.
+
+### Prompts to Avoid
+
+| Avoid | Because | Use instead |
+|---|---|---|
+| Asking for everything at once | Too large to test meaningfully | One layer or feature at a time |
+| "Fix this" with no observation | Claude guesses at the cause | Describe what you ran and what you saw |
+| "Write tests for X" alone | Produces happy-path tests only | Add "focus on edge cases and error conditions" |
+| Two unrelated tasks in one prompt | Hard to test separately | One topic per prompt |
+| Accepting output without reviewing | Misses predictable problems | Use the review prompt on any large result |
+| Starting a new session without context | Claude starts from scratch | Always open with DESIGN.md and README.md |
+
 ### The one rule to keep
 
 The Profiel Service has one architectural rule that is painful to fix if broken:
@@ -270,6 +303,7 @@ a timestamp, belongs to one `partij`, and can be listed and added. Make the prom
 explicit that the implementation must use the existing layering and conventions
 from `DESIGN.md`.
 
+
 Use plan mode (ground rule 7): "Think through how to structure this feature before
 writing any code — the migration, the entity, the service methods, and the
 endpoint." As part of that, ask what could go wrong at runtime — the failure modes
@@ -301,42 +335,12 @@ listing a note round-trips the data through the running service.
   mapping?"
 - If writes do not persist: "The note is returned but not saved. Is the service
   method `@Transactional`?"
+- If Claude changes things you did not ask about: "Why did you change [X]? Is
+  that needed for [Y]?"
+- If the same problem remains after two fix attempts: "Explain what the code is
+  supposed to do here, step by step."
+- If output is too large to know where to start, use the review prompt first and
+  test the areas it flags.
+- If you are unsure whether the result is correct: "What would a test that
+  catches a bug here look like?"
 
----
-
-
-## The Session Pattern
-
-```
-1. Context first    Read README.md and DESIGN.md.
-2. One thing        One task or question per prompt.
-3. Constraints      State what must not happen — Claude will respect them.
-4. Review           Use the review prompt before running large results.
-5. Test             Run ./mvnw verify or quarkus:dev and observe; describe what you see.
-6. Iterate          Describe the observed symptom; ask for the cause.
-7. Document         Ask Claude to update README.md and DESIGN.md.
-```
-
-### When to change approach
-
-| What you observe | What to do |
-|---|---|
-| Claude changes things you did not ask about | "Why did you change [X]? Is that needed for [Y]?" |
-| Same problem after two fix attempts | "Explain what the code is supposed to do here, step by step" |
-| Output is too large to know where to start | Use the review prompt first, then test the areas it flags |
-| Unsure whether the result is correct | "What would a test that catches a bug here look like?" |
-| App fails to start after a schema change | "Does the entity mapping match the Flyway migration? `validate` is strict" |
-
----
-
-## Prompts to Avoid
-
-| Avoid | Because | Use instead |
-|---|---|---|
-| Asking for everything at once | Too large to test meaningfully | One layer or feature at a time |
-| "Fix this" with no observation | Claude guesses at the cause | Describe what you ran and what you saw |
-| "Write tests for X" alone | Produces happy-path tests only | Add "focus on edge cases and error conditions" |
-| Two unrelated tasks in one prompt | Hard to test separately | One topic per prompt |
-| Accepting output without reviewing | Misses predictable problems | Use the review prompt on any large result |
-| Letting logic creep into a controller | Breaks the thin-controller rule | "Move this into a `@Transactional` service method" |
-| Starting a new session without context | Claude starts from scratch | Always open with DESIGN.md and README.md |
