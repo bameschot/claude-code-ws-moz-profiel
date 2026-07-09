@@ -15,7 +15,6 @@ do not fully understand.
 Each exercise has:
 - a **prompting objective** — the communication skill being practised
 - a **task** — what you are trying to accomplish
-- a **starting prompt** — a short, natural prompt you could type right now
 - **hints** — small additions that steer toward a more reliable result
 - a **quality bar** — what a useful response looks like
 - **iteration cues** — signals that you need a follow-up prompt
@@ -33,55 +32,17 @@ The extensions you build here are your own work and inherit the same license.
 
 ---
 
-## What You Are Working On
+## Starting from an Unknown Repository
 
-The Profiel Service lets citizens and businesses (`partijen`) manage their
-contact details (`contactgegevens`) and communication preferences (`voorkeuren`),
-and lets government service providers (`dienstverleners`) retrieve reusable
-profile information. It is organised in layers — the same layering you exploit to
-scope every exercise:
-
-- **Controllers** (`controller/`) — the REST layer under `/api/profielservice/v1`:
-  validate input, map outcomes to status codes and RFC 9457 `problem+json`, record
-  audit entries. No business logic or DB access; they delegate to services.
-  (`ProfielController`, `DienstverlenerController`, `EmailVerificatieController`.)
-- **Services** (`services/`) — the domain logic: `@Transactional` beans that read
-  and write entities and enforce invariants. (`PartijService`,
-  `DienstverlenerService`, `EmailVerificatieService`, plus the shared circuit
-  breaker `VerificatieServiceGuard`.)
-- **Persistence** (`entity/` + `db/migration/`) — **Hibernate Panache** entities
-  (active-record, static finders) over a **Flyway**-owned schema. In production
-  Hibernate only *validates* against it, so schema and entities must always agree.
-- **External clients** — the KVK Basisprofiel and NotifyNL verification services,
-  *generated* from OpenAPI specs and called through the shared circuit breaker.
-- **Cross-cutting** — `SecurityHeadersFilter`, the `@RequireBody` interceptor, the
-  `problem+json` exception mappers, LDV audit logging (`@Logboek`), and the
-  `RetentieScheduler`.
-
-You do not need to hold this in your head — Exercise 1 has you create or update
-`README.md` and `DESIGN.md`: a user-facing project guide plus a Claude-facing
-architecture and conventions map that seeds every later session.
+This course deliberately does not explain the repository structure up front. In
+real work, you often start with a codebase you have never seen before. Exercise 1
+uses Claude Code to explore that unknown repository, identify its architecture and
+conventions, and turn the findings into `README.md` and `DESIGN.md` so the next
+exercise has reliable project context.
 
 ---
 
 ## Before You Start
-
-### What is in the repository
-
-```
-src/main/java/nl/rijksoverheid/moz/   Java source — controllers, services, entities, ...
-src/main/resources/db/migration/       Flyway SQL migrations (V1, V2, V3)
-src/main/resources/openapi/            OpenAPI specs for generated external clients
-src/test/java/                         Test suite (integration, unit, contract, fuzz)
-README.md                              User-facing docs (Dutch)
-quarkus.md                             Quarkus dev-mode notes
-FUZZING.md                             How the fuzz tests work
-pom.xml                                Maven build
-```
-
-`README.md` and `quarkus.md` give you a quick orientation. Exercise 1 updates
-`README.md` where needed and creates `DESIGN.md`: the architecture, conventions,
-and rules Claude should read before every future session.
 
 ### Prerequisites
 
@@ -211,20 +172,16 @@ Explore the repository and produce the two files that seed every later session:
 If `README.md` already exists, update it rather than replacing useful existing
 content. If `DESIGN.md` does not exist, create it at the repository root.
 
-### Starting prompt
-
-> "Explore the repository and create or update the living documentation.
->
-> Update README.md so a developer can understand what the service does, how to run
-> it, how to test it, where the API docs are, and what the main domain concepts
-> are.
->
-> Create DESIGN.md in the root of the repository. It should describe the
-> architecture, package structure, API shape, tech stack, database model, testing
-> approach, coding conventions, recurring implementation patterns, and the rules
-> future changes must preserve."
-
 ### Hints
+Start by asking Claude to explore the repository and create or update the living
+documentation. The prompt should explicitly tell it to update `README.md` so a
+developer can understand what the service does, how to run it, how to test it,
+where the API docs are, and what the main domain concepts are. It should also
+tell Claude to create `DESIGN.md` in the repository root with the architecture,
+package structure, API shape, tech stack, database model, testing approach,
+coding conventions, recurring implementation patterns, and rules future changes
+must preserve.
+
 A useful result separates user-facing information from implementation guidance:
 
 - Put practical usage information in `README.md`: purpose, local setup, test
@@ -307,13 +264,12 @@ Add a new domain concept end-to-end. For example, a `notitie` (a free-text note
 attached to a partij) or a `toestemming` (a consent record). Build it bottom-up:
 **migration + entity → service → controller → tests.**
 
-### Starting prompt
-
-> "Add the ability to attach notes to a partij. A note has text and a timestamp,
-> belongs to one partij, and can be listed and added. Use the existing layering
-> and conventions."
-
 ### Hints
+Ask Claude to add the ability to attach notes to a `partij`: a note has text and
+a timestamp, belongs to one `partij`, and can be listed and added. Make the prompt
+explicit that the implementation must use the existing layering and conventions
+from `DESIGN.md`.
+
 Use plan mode (ground rule 7): "Think through how to structure this feature before
 writing any code — the migration, the entity, the service methods, and the
 endpoint." As part of that, ask what could go wrong at runtime — the failure modes
