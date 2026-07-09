@@ -105,16 +105,19 @@ Use the same loop throughout the course. It keeps Claude grounded in the project
 keeps each change testable, and gives you clear follow-up prompts when something
 does not work:
 
-```text
-1. Context first    Read README.md and DESIGN.md before asking for a change.
-2. One thing        Ask for one task or one question at a time.
-3. Constraints      State what must not happen, such as controller logic or raw PII in logs.
-4. Plan             For larger changes, ask Claude to explain the layers and risks first.
-5. Review           Ask Claude to review its own output before you run it.
-6. Test             Run ./mvnw verify or quarkus:dev and observe the real behaviour.
-7. Iterate          Describe the observed symptom and ask for the cause.
-8. Document         Ask Claude to update README.md and DESIGN.md before moving on.
-```
+1. **Context first** — read `README.md` and `DESIGN.md` before asking for a
+   change.
+2. **One thing** — ask for one task or one question at a time.
+3. **Constraints** — state what must not happen, such as controller logic or raw
+   PII in logs.
+4. **Plan** — for larger changes, ask Claude to explain the layers and risks
+   first.
+5. **Review** — ask Claude to review its own output before you run it.
+6. **Test** — run `./mvnw verify` or `quarkus:dev` and observe the real
+   behaviour.
+7. **Iterate** — describe the observed symptom and ask for the cause.
+8. **Document** — ask Claude to update `README.md` and `DESIGN.md` before moving
+   on.
 
 Do not treat this as ceremony. Each step gives Claude better context or gives you
 better evidence. If a result is surprising, do not ask Claude to "fix it" in the
@@ -132,18 +135,6 @@ and ask it to reason from that observation.
 | Accepting output without reviewing | Misses predictable problems | Use the review prompt on any large result |
 | Starting a new session without context | Claude starts from scratch | Always open with DESIGN.md and README.md |
 
-### The one rule to keep
-
-The Profiel Service has one architectural rule that is painful to fix if broken:
-
-> **Controllers stay thin.** No database access and no business logic in the REST
-> layer — all domain logic goes in a `@Transactional` service method. And PII
-> (identificatienummers such as BSN/KVK/RSIN) must be hashed via `HashHelper`
-> before it is written to a log.
-
-State this rule when you ask for anything touching a controller or adding logging,
-and record it in `DESIGN.md` during Exercise 1 so it applies in every future
-session without repeating it.
 
 ---
 
@@ -230,21 +221,19 @@ A useful result separates user-facing information from implementation guidance:
   error format, Quarkus, Hibernate Panache, Flyway migrations, database tables,
   test commands, and coverage requirements.
 
-Also ask Claude to extract the conventions that future changes must follow:
+Also ask Claude to extract the conventions that future changes must follow. Do
+not provide those conventions up front; have Claude discover them from the source
+and cite the files that prove them. Useful categories to look for are:
 
-- **Controllers stay thin**: no database access and no business logic in the REST
-  layer.
-- **Transactions**: writes happen inside `@Transactional` service methods.
-- **Errors**: RFC 9457 `problem+json`, built through the existing `Problems`
-  helper.
-- **Request bodies**: mutating endpoints use `@RequireBody`; request DTOs are
-  Java `record`s validated with Bean Validation.
-- **Auditing and PII**: operations use `@Logboek(...)`; identifiers such as
-  BSN/KVK/RSIN are hashed with `HashHelper` before logging.
-- **Persistence**: entities use Hibernate Panache active-record patterns and must
-  match Flyway migrations because schema validation is strict.
-- **Mapping**: entity-to-DTO conversion follows the existing mapper style.
-- **Scopes**: document how `dienstverlener_dienst` models service-provider scope.
+- where request handling, domain logic, persistence, validation, mapping, and
+  tests belong
+- how transactions and consistency boundaries are handled
+- how errors and validation failures are represented to clients
+- how request and response objects are shaped
+- how logging, auditing, security, and sensitive data are handled
+- how database schema changes are made and verified
+- how external systems, generated clients, or background jobs are integrated
+- how shared or cross-cutting behaviour is implemented without duplication
 
 ### Quality bar
 `README.md` should let a new developer run and test the service without hunting
