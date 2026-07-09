@@ -58,22 +58,13 @@ scope every exercise:
   `problem+json` exception mappers, LDV audit logging (`@Logboek`), and the
   `RetentieScheduler`.
 
-You do not need to hold this in your head — Exercise 1 has you build `design.md`, a
+You do not need to hold this in your head — Exercise 1 has you build `DESIGN.md`, a
 map of exactly this, which then seeds every later session.
 
 ---
 
 ## Before You Start
 
-### Getting the workspace
-
-Work directly in a clone of this repository. There is no separate starter
-package — the whole point is to practise on the real service.
-
-```sh
-git clone <repo-url> moza-profiel-service
-cd moza-profiel-service
-```
 
 ### What is in the repository
 
@@ -89,7 +80,7 @@ pom.xml                                Maven build
 ```
 
 `README.md` and `quarkus.md` give you a quick orientation. You will not find a
-`design.md` yet — producing that architecture map is Exercise 1, and from then on
+`DESIGN.md` yet — producing that architecture map is Exercise 1, and from then on
 it is the fastest way to orient a new session.
 
 ### Prerequisites
@@ -132,7 +123,7 @@ reverts it. Commit after each exercise passes; the history also lets you ask Cla
 
 4. **Review large output before running it.** See *The Review Prompt* below.
 
-5. **Keep `README.md` and `design.md` current.** See *Living Documentation* below.
+5. **Keep `README.md` and `DESIGN.md` current.** See *Living Documentation* below.
 
 6. **Commit when tests pass.** A passing commit is a safe rollback point. If the
    next prompt breaks something, `git checkout .` gets you back instantly.
@@ -157,7 +148,7 @@ The Profiel Service has one architectural rule that is painful to fix if broken:
 > before it is written to a log.
 
 State this rule when you ask for anything touching a controller or adding logging,
-and record it in `design.md` (Exercise 2) so it applies in every future session
+and record it in `DESIGN.md` (Exercise 2) so it applies in every future session
 without repeating it.
 
 ---
@@ -185,15 +176,15 @@ exercise that produces non-trivial output.
 ## Living Documentation
 
 Across sessions Claude loses track of what has been built. Two committed files fix
-this — open every new session with them ("Read design.md and README.md before we
+this — open every new session with them ("Read DESIGN.md and README.md before we
 continue"):
 
 - `README.md` — for a **user**: what the service does, how to run it, what
   endpoints exist.
-- `design.md` — for **Claude**: the layered architecture, key design decisions,
+- `DESIGN.md` — for **Claude**: the layered architecture, key design decisions,
   what each package does, and the rules to keep (such as the thin-controller rule).
 
-After each exercise, ask Claude to *"update README.md and design.md to reflect what
+After each exercise, ask Claude to *"update README.md and DESIGN.md to reflect what
 was just added,"* then run `/compact` before the next one. Each exercise fills the
 context window with code, test output, and fixes; `/compact` summarises and
 discards the detail. Because the two docs are already committed and current, almost
@@ -209,14 +200,14 @@ Ask Claude to turn an unfamiliar source tree into something you can navigate.
 ### Task
 Explore the source code and give Claude an overview of the structure it can work
 with: the contents, structure, API, tech stack, database model and structure, and
-testing methods and requirements — captured in a `design.md` at the repo root.
+testing methods and requirements — captured in a `DESIGN.md` at the repo root.
 There is no such document yet; you are creating it.
 
 ### Starting prompt
 
 > "Explore the repository and describe the contents, structure, API and tech
 > stack, database model and structure, and testing methods and requirements in a
-> document called design.md placed in the root of the repository."
+> document called DESIGN.md placed in the root of the repository."
 
 ### Hints
 That prompt works but produces a wall of prose. A few additions make the output
@@ -344,7 +335,7 @@ reuse?" This keeps the thin-controller rule intact.
 
 After it compiles, test it: start `./mvnw quarkus:dev`, open
 `http://localhost:8080/docs`, and call the new endpoint. Then update `README.md`
-and `design.md`.
+and `DESIGN.md`.
 
 ### Quality bar
 With dev mode running, the endpoint appears in Swagger UI, returns the expected
@@ -402,7 +393,7 @@ running it:
 > "Review the layer you just wrote. What are the most likely correctness or schema
 > problems?"
 
-When it's complete, update `README.md` and `design.md`.
+When it's complete, update `README.md` and `DESIGN.md`.
 
 ### Quality bar
 `./mvnw verify` passes at each layer. The service starts cleanly (proving the
@@ -452,7 +443,7 @@ Spell out the contract precisely; this is where guessing produces subtle bugs:
 Test each verb and describe what you observe if something is off. Try deleting a
 note that does not exist and confirm you get a `problem+json` 404, not a 500.
 
-When it's complete, update `README.md` and `design.md`.
+When it's complete, update `README.md` and `DESIGN.md`.
 
 ### Quality bar
 Each verb returns the correct status code; a duplicate create returns 200 (not a
@@ -501,7 +492,7 @@ represented in the codebase — entity, migration, DTOs, mapper, service, contro
 tests"** first, then ask for the field in a second prompt. Seeing the full list up
 front tells you whether the change is really small or secretly large.
 
-Then update `design.md` (and `README.md` if it lists the note fields).
+Then update `DESIGN.md` (and `README.md` if it lists the note fields).
 
 ### Quality bar
 The new field can be sent to the note endpoints and is accepted, validated, and
@@ -566,7 +557,7 @@ Use the review prompt after step 1, since the migration is the risky part:
 > "Review the Envers migration and config change. What is most likely to break
 > startup or schema validation?"
 
-When complete, update `README.md` and `design.md`.
+When complete, update `README.md` and `DESIGN.md`.
 
 ### Quality bar
 The app starts with Envers enabled (proving the audit-table migration matches what
@@ -614,7 +605,7 @@ Once you have the design confirmed, ask for the implementation:
 > "Implement it. Existing endpoints without paging parameters should keep their
 > current behaviour."
 
-Then update `README.md` and `design.md`.
+Then update `README.md` and `DESIGN.md`.
 
 ### Quality bar
 A list endpoint with `?page=&size=` returns the right slice; the same endpoint
@@ -632,13 +623,13 @@ the change did not alter unrelated behaviour.
 ## The Session Pattern
 
 ```
-1. Context first    Read README.md and design.md.
+1. Context first    Read README.md and DESIGN.md.
 2. One thing        One task or question per prompt.
 3. Constraints      State what must not happen — Claude will respect them.
 4. Review           Use the review prompt before running large results.
 5. Test             Run ./mvnw verify or quarkus:dev and observe; describe what you see.
 6. Iterate          Describe the observed symptom; ask for the cause.
-7. Document         Ask Claude to update README.md and design.md.
+7. Document         Ask Claude to update README.md and DESIGN.md.
 ```
 
 ### When to change approach
@@ -663,4 +654,4 @@ the change did not alter unrelated behaviour.
 | Two unrelated tasks in one prompt | Hard to test separately | One topic per prompt |
 | Accepting output without reviewing | Misses predictable problems | Use the review prompt on any large result |
 | Letting logic creep into a controller | Breaks the thin-controller rule | "Move this into a `@Transactional` service method" |
-| Starting a new session without context | Claude starts from scratch | Always open with design.md and README.md |
+| Starting a new session without context | Claude starts from scratch | Always open with DESIGN.md and README.md |
