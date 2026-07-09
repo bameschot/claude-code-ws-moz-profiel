@@ -58,13 +58,13 @@ scope every exercise:
   `problem+json` exception mappers, LDV audit logging (`@Logboek`), and the
   `RetentieScheduler`.
 
-You do not need to hold this in your head — Exercise 1 has you build `DESIGN.md`, a
-map of exactly this, which then seeds every later session.
+You do not need to hold this in your head — Exercise 1 has you create or update
+`README.md` and `DESIGN.md`: a user-facing project guide plus a Claude-facing
+architecture and conventions map that seeds every later session.
 
 ---
 
 ## Before You Start
-
 
 ### What is in the repository
 
@@ -79,9 +79,9 @@ FUZZING.md                             How the fuzz tests work
 pom.xml                                Maven build
 ```
 
-`README.md` and `quarkus.md` give you a quick orientation. You will not find a
-`DESIGN.md` yet — producing that architecture map is Exercise 1, and from then on
-it is the fastest way to orient a new session.
+`README.md` and `quarkus.md` give you a quick orientation. Exercise 1 updates
+`README.md` where needed and creates `DESIGN.md`: the architecture, conventions,
+and rules Claude should read before every future session.
 
 ### Prerequisites
 
@@ -130,7 +130,7 @@ reverts it. Commit after each exercise passes; the history also lets you ask Cla
 
 7. **Use plan mode for complex exercises.** Before a large or high-stakes change,
    switch into plan mode (Shift+Tab) so Claude designs and gets your approval
-   before writing anything. Especially useful for Exercises 4 and 7, where a
+   before writing anything. Especially useful for Exercises 3 and 6, where a
    structural mistake is expensive to undo.
 
 8. **Match the model to the task.** Use **Opus / high effort** for analysis,
@@ -148,8 +148,8 @@ The Profiel Service has one architectural rule that is painful to fix if broken:
 > before it is written to a log.
 
 State this rule when you ask for anything touching a controller or adding logging,
-and record it in `DESIGN.md` (Exercise 2) so it applies in every future session
-without repeating it.
+and record it in `DESIGN.md` during Exercise 1 so it applies in every future
+session without repeating it.
 
 ---
 
@@ -182,7 +182,8 @@ continue"):
 - `README.md` — for a **user**: what the service does, how to run it, what
   endpoints exist.
 - `DESIGN.md` — for **Claude**: the layered architecture, key design decisions,
-  what each package does, and the rules to keep (such as the thin-controller rule).
+  what each package does, recurring conventions, and the rules to keep (such as
+  the thin-controller rule).
 
 After each exercise, ask Claude to *"update README.md and DESIGN.md to reflect what
 was just added,"* then run `/compact` before the next one. Each exercise fills the
@@ -192,118 +193,108 @@ nothing important is lost — Claude reconstructs the project state from them.
 
 ---
 
-## Exercise 1 — Get a Map of the Codebase
+## Exercise 1 — Create the Living Documentation
 
 ### Prompting objective
-Ask Claude to turn an unfamiliar source tree into something you can navigate.
+Ask Claude to turn an unfamiliar source tree into reusable project context: a
+human-facing `README.md` and a Claude-facing `DESIGN.md`.
 
 ### Task
-Explore the source code and give Claude an overview of the structure it can work
-with: the contents, structure, API, tech stack, database model and structure, and
-testing methods and requirements — captured in a `DESIGN.md` at the repo root.
-There is no such document yet; you are creating it.
+Explore the repository and produce the two files that seed every later session:
+
+- `README.md` — for users and developers who need to understand, run, test, and
+  use the service at a high level.
+- `DESIGN.md` — for Claude and future maintainers: the architecture map, package
+  responsibilities, design decisions, coding conventions, recurring patterns, and
+  rules that must be preserved.
+
+If `README.md` already exists, update it rather than replacing useful existing
+content. If `DESIGN.md` does not exist, create it at the repository root.
 
 ### Starting prompt
 
-> "Explore the repository and describe the contents, structure, API and tech
-> stack, database model and structure, and testing methods and requirements in a
-> document called DESIGN.md placed in the root of the repository."
+> "Explore the repository and create or update the living documentation.
+>
+> Update README.md so a developer can understand what the service does, how to run
+> it, how to test it, where the API docs are, and what the main domain concepts
+> are.
+>
+> Create DESIGN.md in the root of the repository. It should describe the
+> architecture, package structure, API shape, tech stack, database model, testing
+> approach, coding conventions, recurring implementation patterns, and the rules
+> future changes must preserve."
 
 ### Hints
-That prompt works but produces a wall of prose. A few additions make the output
-navigable and reusable:
+A useful result separates user-facing information from implementation guidance:
 
-- Ask for a **specific format**: "for the code, use a table — one row per package
-  (or key class), showing its responsibility, what it provides, and what it
-  depends on."
-- Ask for a **dependency diagram**: "add a short diagram showing how the layers
-  call into each other — controller → service → entity, plus the external
-  clients and cross-cutting filters."
-- Ask it to **cover the whole picture, not just the Java**: "include the REST API
-  (endpoints, base path, error format), the tech stack (Quarkus, Hibernate
-  Panache, Flyway, ...), the database schema from the Flyway migrations (tables,
-  keys, important constraints), and how the tests are run and what the coverage
-  gate requires."
+- Put practical usage information in `README.md`: purpose, local setup, test
+  commands, Swagger/OpenAPI URLs, and a short domain/API overview.
+- Put architecture and change guidance in `DESIGN.md`: layers, package map,
+  dependencies, database schema, external clients, testing strategy, and rules for
+  adding new features.
+- For the codebase map, ask for a table: one row per package or key class,
+  showing its responsibility, what it provides, and what it depends on.
+- Ask for a short dependency diagram showing how the layers call into each other:
+  controller → service → entity, plus external clients and cross-cutting filters.
+- Ask it to cover the whole picture, not just Java: REST endpoints, base path,
+  error format, Quarkus, Hibernate Panache, Flyway migrations, database tables,
+  test commands, and coverage requirements.
+
+Also ask Claude to extract the conventions that future changes must follow:
+
+- **Controllers stay thin**: no database access and no business logic in the REST
+  layer.
+- **Transactions**: writes happen inside `@Transactional` service methods.
+- **Errors**: RFC 9457 `problem+json`, built through the existing `Problems`
+  helper.
+- **Request bodies**: mutating endpoints use `@RequireBody`; request DTOs are
+  Java `record`s validated with Bean Validation.
+- **Auditing and PII**: operations use `@Logboek(...)`; identifiers such as
+  BSN/KVK/RSIN are hashed with `HashHelper` before logging.
+- **Persistence**: entities use Hibernate Panache active-record patterns and must
+  match Flyway migrations because schema validation is strict.
+- **Mapping**: entity-to-DTO conversion follows the existing mapper style.
+- **Scopes**: document how `dienstverlener_dienst` models service-provider scope.
 
 ### Quality bar
-The output should name specific roles ("shared circuit breaker guarding the
-NotifyNL verification calls", "retention scheduler that sets `te_verwijderen_op`
-on stale records") not vague ones ("handles verification", "manages data"). The
-database section should list real tables and constraints drawn from the Flyway
-migrations, not a generic guess, and the testing section should name the actual
-commands (`./mvnw verify`) and the coverage requirement. If a section feels
-generic, follow up: "What does this do that nothing else does?"
+`README.md` should let a new developer run and test the service without hunting
+through the codebase.
+
+`DESIGN.md` should be specific enough that Claude can use it as startup context in
+a future session. It should name real classes, packages, tables, endpoints,
+constraints, commands, and conventions from this repository, not generic Quarkus
+advice.
+
+The conventions section must include concrete examples from the existing code:
+the actual annotation names, helper names, transaction style, validation style,
+mapping style, and error-handling approach.
+
+After Claude produces the files, use the review prompt:
+
+> "Review README.md and DESIGN.md. Are they missing anything important that a new
+> session would need before safely changing this service?"
 
 ### Iteration cues
-- If two classes seem to overlap, ask: "What is the boundary between
-  `PartijService` and `DienstverlenerService`?"
-- If a section is missing or thin (say the database or testing part), ask for it
-  directly: "Add the database schema from the Flyway migrations, with tables and
-  key constraints."
-- Keep this file — you will refer back to it throughout the project.
+- If `README.md` duplicates too much architecture detail, ask: "Move
+  implementation guidance into DESIGN.md and keep README.md focused on running
+  and using the service."
+- If `DESIGN.md` is only a package summary, ask: "Add the recurring conventions
+  and rules future changes must preserve."
+- If the database section is thin, ask: "Add the database schema from the Flyway
+  migrations, with tables, relationships, and key constraints."
+- If the conventions are vague, ask: "For each convention, cite one concrete
+  existing class, annotation, helper, or method that demonstrates it."
+- Keep both files current — every later exercise should update `README.md` and
+  `DESIGN.md` when behaviour, architecture, or conventions change.
 
 ---
 
-## Exercise 2 — Build a Conventions & Patterns Reference
+## Exercise 2 — Use the Living Documentation to Add a Read Endpoint
 
 ### Prompting objective
-Generate a reusable document before a large task so Claude applies consistent
-choices throughout, rather than reinventing them for each new endpoint.
-
-### Task
-Create a reference that captures how *this* service is built — the recurring
-patterns a new endpoint or feature must follow to fit in.
-
-### Starting prompt
-
-> "Create a document describing the coding conventions and recurring patterns in
-> this service, so that new endpoints and features can be added consistently.
-> Place it in the root of the repository."
-
-### Hints
-The starting prompt gets you a general description. Ask Claude to capture the
-specific patterns that make this service consistent:
-
-- **Errors**: RFC 9457 `problem+json`, always built with the `Problems` helper
-  (`Problems.notFound(...)`, `Problems.missingBody()`), never raw exceptions.
-- **Request bodies**: mutating endpoints are annotated `@RequireBody`; request
-  DTOs are Java `record`s validated with Bean Validation (`@Valid`, and the custom
-  `@ValidIdentificatieNummer`).
-- **Auditing & PII**: every operation is annotated `@Logboek(...)` with a
-  processing-activity id, and identifiers are hashed with `HashHelper` before
-  logging.
-- **Persistence**: entities are Panache active-record with static finders; all
-  writes happen inside a `@Transactional` service method.
-- **Mapping**: entity→DTO conversion goes through MapStruct (`PartijMapper`).
-- **Scopes**: the `dienstverlener_dienst` join models a scope; a `null` dienst
-  means the scope applies to the whole dienstverlener.
-
-Include the thin-controller rule from *The one rule to keep* verbatim, so you can
-read it into future prompts.
-
-After getting the document, use the review prompt:
-
-> "Review this conventions document. Is there anything important for adding a new
-> endpoint to this service that is missing?"
-
-### Quality bar
-The document should show a *concrete* example of each pattern (the actual
-annotation, the actual helper call), not a vague description. If you later see a
-controller calling a Panache finder directly, or an error returned as a plain
-`500`, the convention was not applied.
-
-### Iteration cues
-- Save this document in the repository. At the start of each subsequent session,
-  ask Claude to read it: "Read the conventions document before we continue."
-- If Claude makes an inconsistent choice later, point back to it: "The conventions
-  doc says errors go through `Problems`. Revise to match it."
-
----
-
-## Exercise 3 — Add a Read Endpoint
-
-### Prompting objective
-Describe a component by what it must do, not how to implement it.
+Start a coding task by loading the project context from `README.md` and
+`DESIGN.md`, then describe a component by what it must do rather than how to
+implement it.
 
 ### Background
 Read endpoints are the safest place to practise behaviour-first prompting: no data
@@ -312,18 +303,22 @@ read endpoints (`POST /partij`, `GET /dienstverlener/{naam}`) you can point Clau
 at as examples of the house style.
 
 ### Task
-Add a new read-only endpoint — for example, one that lists all registered
-`dienstverleners`, or one that returns a party's default contact detail per type.
+After reading `README.md` and `DESIGN.md`, add a new read-only endpoint — for
+example, one that lists all registered `dienstverleners`, or one that returns a
+party's default contact detail per type.
 
 ### Starting prompt
 
-> "Add a read-only endpoint that lists all registered dienstverleners with their
-> services. Follow the existing conventions in this service."
+> "Read README.md and DESIGN.md first. Then add a read-only endpoint that lists
+> all registered dienstverleners with their services. Follow the existing
+> conventions in this service."
 
 ### Hints
 Describe the *behaviour and the contract*, and let Claude choose the
 implementation:
 
+- "Before writing code, tell me which conventions from DESIGN.md apply and where
+  this endpoint should live."
 - "It should return 200 with a JSON array, and an empty array (not a 404) when
   there are none."
 - "Reuse the existing response DTO shape used by `GET /dienstverlener/{naam}` if
@@ -351,7 +346,7 @@ query the database itself.
 
 ---
 
-## Exercise 4 — Implement a Vertical Feature Across Layers
+## Exercise 3 — Implement a Vertical Feature Across Layers
 
 ### Prompting objective
 Scope a large feature into layers you can test one at a time.
@@ -409,7 +404,7 @@ listing a note round-trips the data through the running service.
 
 ---
 
-## Exercise 5 — Build a Full CRUD Resource
+## Exercise 4 — Build a Full CRUD Resource
 
 ### Prompting objective
 Describe behaviour precisely so Claude does not have to guess what the client
@@ -423,7 +418,7 @@ resources return **404** as `problem+json`; conflicting writes return **409**.
 `ProfielController.addContactgegeven` is the reference for this style.
 
 ### Task
-Extend the resource from Exercise 4 into full CRUD — add update and delete — with
+Extend the resource from Exercise 3 into full CRUD — add update and delete — with
 status codes and semantics that match the rest of the service.
 
 ### Starting prompt
@@ -458,14 +453,14 @@ controller stays thin — all the branching lives in the service.
 
 ---
 
-## Exercise 6 — A Small, Well-Scoped Addition
+## Exercise 5 — A Small, Well-Scoped Addition
 
 ### Prompting objective
 Write a minimal prompt for a well-scoped addition — just enough to be
 unambiguous.
 
 ### Task
-Add one small, optional field to the note resource you built in Exercises 4 and 5
+Add one small, optional field to the note resource you built in Exercises 3 and 4
 — for example a `categorie` label — validated and mapped like the note's existing
 fields. This is the "small addition to the thing you just built" step: after
 decomposing a large feature, you now practise recognising when a change is genuinely
@@ -477,13 +472,13 @@ small.
 
 ### Hints
 That terse prompt is deliberately enough. The lesson here is the opposite of
-Exercise 4: when a change really is small, over-specifying the prompt just gets in
+Exercise 3: when a change really is small, over-specifying the prompt just gets in
 the way — state the goal and let Claude fit it to the existing note code.
 
 One thing worth checking after: does the new field flow through every layer the
 note already touches — the entity, a Flyway migration, the request/response DTOs,
 the `PartijMapper`-style mapping, and validation — and is it rejected cleanly when
-invalid? Remember the Exercise 4 lesson: `schema-management` is `validate`, so the
+invalid? Remember the Exercise 3 lesson: `schema-management` is `validate`, so the
 new column needs a matching migration or the app will not start.
 
 This exercise also introduces a useful pattern for any change that touches a name
@@ -509,7 +504,7 @@ code changed.
 
 ---
 
-## Exercise 7 — A Larger Multi-Step Feature: Audit History API
+## Exercise 6 — A Larger Multi-Step Feature: Audit History API
 
 ### Prompting objective
 Break a large feature into a sequence of steps, each small enough to test before
@@ -532,7 +527,7 @@ contact details and preferences over time.
 > change history of a partij."
 
 ### Hints
-Use plan mode (as in Exercise 4): "Think through how to enable Envers and expose
+Use plan mode (as in Exercise 3): "Think through how to enable Envers and expose
 its history safely — the migration for the audit tables, the config change, and
 the query API." Agree on the structure, then proceed step by step.
 
@@ -573,7 +568,7 @@ both revisions in order.
 
 ---
 
-## Exercise 8 — A Cross-Cutting Change With Minimal Blast Radius
+## Exercise 7 — A Cross-Cutting Change With Minimal Blast Radius
 
 ### Prompting objective
 Ask Claude to find the minimal change before making one that touches everything.
